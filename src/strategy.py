@@ -49,8 +49,38 @@ class ExamColoringStrategy(EventColoringStrategy):
 
     def __init__(self, interactive=False):
         self.interactive = interactive
-        self.exam_decision_cache = {}
-        self.subscribed_titles = set()
+        self.exam_states_file = "exam_states.json"
+
+        if self.interactive:
+            self.exam_decision_cache = {}
+        else:
+            self.exam_decision_cache = self._load_exam_states()
+
+        self.subscribed_titles = self._derive_subscribed_titles()
+
+    def _load_exam_states(self):
+        if os.path.exists(self.exam_states_file):
+            try:
+                with open(self.exam_states_file, "r") as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                print(
+                    f"{Colors.WARNING}⚠ Warning: '{self.exam_states_file}' is corrupted. Starting fresh.{Colors.ENDC}"
+                )
+                return {}
+        return {}
+
+    def _save_exam_states(self):
+        with open(self.exam_states_file, "w") as f:
+            json.dump(self.exam_decision_cache, f, indent=4)
+
+    def _derive_subscribed_titles(self):
+        subscribed = set()
+        for key, color in self.exam_decision_cache.items():
+            if color == self.COLOR_RED:
+                title = key.rsplit(" (", 1)[0]
+                subscribed.add(title)
+        return subscribed
 
     def determine_color(self, event):
         title = event.get("summary", "")
@@ -59,16 +89,14 @@ class ExamColoringStrategy(EventColoringStrategy):
         if not title.startswith("Esame: "):
             return None
 
+        start_info = event.get("start", {})
+        date_str = start_info.get("dateTime", start_info.get("date", "Unknown Date"))
+        if "T" in date_str:
+            date_str = date_str.split("T")[0]
+
+        cache_key = f"{title} ({date_str})"
+
         if self.interactive:
-            start_info = event.get("start", {})
-            date_str = start_info.get(
-                "dateTime", start_info.get("date", "Unknown Date")
-            )
-            if "T" in date_str:
-                date_str = date_str.split("T")[0]
-
-            cache_key = f"{title} ({date_str})"
-
             if cache_key in self.exam_decision_cache:
                 return self.exam_decision_cache[cache_key]
 
@@ -77,6 +105,7 @@ class ExamColoringStrategy(EventColoringStrategy):
                     f"{Colors.WARNING} ↳ Auto-declining '{title}' on {date_str} (already subscribed to another date){Colors.ENDC}"
                 )
                 self.exam_decision_cache[cache_key] = self.COLOR_GREY
+                self._save_exam_states()
                 return self.COLOR_GREY
 
             suggestion_str = ""
@@ -97,7 +126,7 @@ class ExamColoringStrategy(EventColoringStrategy):
                 )
 
             while True:
-                prompt_msg = f"{Colors.OKCYAN}❓ Subscribed to '{title}' on {date_str}?{Colors.ENDC}{suggestion_str}: "
+                prompt_msg = f"{Colors.OKCYAN}❓ Subscribed to '{title}' on {date_str}?{suggestion_str}: {Colors.ENDC}"
                 ans = input(prompt_msg).strip().lower()
 
                 if ans == "" and default_ans:
@@ -106,9 +135,11 @@ class ExamColoringStrategy(EventColoringStrategy):
                 if ans in ["y", "yes"]:
                     self.exam_decision_cache[cache_key] = self.COLOR_RED
                     self.subscribed_titles.add(title)
+                    self._save_exam_states()
                     break
                 elif ans in ["n", "no"]:
                     self.exam_decision_cache[cache_key] = self.COLOR_GREY
+                    self._save_exam_states()
                     break
                 else:
                     print(
@@ -116,11 +147,27 @@ class ExamColoringStrategy(EventColoringStrategy):
                     )
             return self.exam_decision_cache[cache_key]
         else:
-            if description.startswith("Non iscritto"):
+            if cache_key in self.exam_decision_cache:
+                return self.exam_decision_cache[cache_key]
+
+            if title in self.subscribed_titles:
+                self.exam_decision_cache[cache_key] = self.COLOR_GREY
+                self._save_exam_states()
                 return self.COLOR_GREY
+
+            color = None
+            if description.startswith("Non iscritto"):
+                color = self.COLOR_GREY
             elif description.startswith("Iscritto"):
-                return self.COLOR_RED
-        return None
+                color = self.COLOR_RED
+
+            if color is not None:
+                self.exam_decision_cache[cache_key] = color
+                if color == self.COLOR_RED:
+                    self.subscribed_titles.add(title)
+                self._save_exam_states()
+
+            return color
 
 
 class LectureColoringStrategy(EventColoringStrategy):
