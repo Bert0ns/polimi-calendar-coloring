@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'What to sync'
+        description: "What to sync"
         required: true
-        default: 'lectures'
+        default: "lectures"
         type: choice
         options:
           - exams
           - lectures
       verbose:
-        description: 'Enable verbose logging'
+        description: "Enable verbose logging"
         required: false
         default: false
         type: boolean
@@ -30,8 +30,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip'
+          python-version: "3.10"
+          cache: "pip"
 
       - name: Install dependencies
         run: pip install -r requirements.txt

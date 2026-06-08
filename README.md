@@ -82,8 +82,8 @@ python3 src/main.py exams -i
 python3 src/main.py lectures -i
 ```
 
-- **When running `exams -i`**: The script parses event descriptions to offer a `[Suggested: y/n]` answer—just press `Enter` to accept. Once you say `y` to an exam, it automatically declines any other dates for that exact exam!
-- **When running `lectures -i`**: The script **ignores** your saved JSON file and lets you assign fresh colors to all your courses from a printed palette. Your new choices are saved automatically.
+- **When running `exams -i`**: The script asks you **two** questions per exam. First, it asks if you are subscribed (to smartly auto-decline duplicate dates). Second, it prints the full 11-color palette so you can manually assign a specific custom color to that exam (defaulting to 11 if subscribed, or 8 if not).
+- **When running `lectures -i`**: The script **ignores** your saved JSON file and prints the full 11-color palette. It lets you assign fresh custom colors to all your courses, and saves your new choices automatically.
 
 ### Verbose Logging
 
