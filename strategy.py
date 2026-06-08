@@ -1,6 +1,13 @@
 from abc import ABC, abstractmethod
 
 
+class Colors:
+    OKCYAN = "\033[96m"
+    WARNING = "\033[93m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+
+
 class EventColoringStrategy(ABC):
     """Abstract base class defining the contract for coloring strategies."""
 
@@ -53,7 +60,7 @@ class PolimiExamColoringStrategy(EventColoringStrategy):
                 # if they already said 'y' to this exam on a different date, auto-decline this one.
                 if title in self.subscribed_titles:
                     print(
-                        f"Auto-declining '{title}' on {date_str} because you are already subscribed to another date."
+                        f"{Colors.WARNING} ↳ Auto-declining '{title}' on {date_str} (already subscribed to another date){Colors.ENDC}"
                     )
                     self.decision_cache[cache_key] = self.COLOR_GREY
                     return self.COLOR_GREY
@@ -61,14 +68,22 @@ class PolimiExamColoringStrategy(EventColoringStrategy):
                 suggestion_str = ""
                 default_ans = None
                 if description.startswith("Non iscritto"):
-                    suggestion_str = " [Suggested: n (Not subscribed)]"
+                    suggestion_str = (
+                        f" [{Colors.BOLD}y{Colors.ENDC}/{Colors.BOLD}N{Colors.ENDC}]"
+                    )
                     default_ans = "n"
                 elif description.startswith("Iscritto"):
-                    suggestion_str = " [Suggested: y (Subscribed)]"
+                    suggestion_str = (
+                        f" [{Colors.BOLD}Y{Colors.ENDC}/{Colors.BOLD}n{Colors.ENDC}]"
+                    )
                     default_ans = "y"
+                else:
+                    suggestion_str = (
+                        f" [{Colors.BOLD}y{Colors.ENDC}/{Colors.BOLD}n{Colors.ENDC}]"
+                    )
 
                 while True:
-                    prompt_msg = f"Are you subscribed to '{title}' on {date_str}?{suggestion_str} (y/n): "
+                    prompt_msg = f"{Colors.OKCYAN}❓ Subscribed to '{title}' on {date_str}?{suggestion_str}: {Colors.ENDC}"
                     ans = input(prompt_msg).strip().lower()
 
                     # Default to suggestion if user just presses Enter
@@ -84,7 +99,7 @@ class PolimiExamColoringStrategy(EventColoringStrategy):
                         break
                     else:
                         print(
-                            "Please answer 'y' or 'n'. If there is a suggestion, you can press Enter to accept it."
+                            f"{Colors.WARNING} ↳ Please answer 'y' or 'n' (or press Enter for suggestion).{Colors.ENDC}"
                         )
                 return self.decision_cache[cache_key]
             else:

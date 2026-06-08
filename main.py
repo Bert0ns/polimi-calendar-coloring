@@ -1,11 +1,22 @@
 import sys
 import os
 import argparse
+import time
 from dotenv import load_dotenv
 
 from auth import Authenticator
 from calendar_client import CalendarClient
 from strategy import PolimiExamColoringStrategy
+
+
+class Colors:
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
 
 
 class CalendarSyncProcessor:
@@ -31,31 +42,33 @@ class CalendarSyncProcessor:
             print(message)
 
     def process(self):
-        print(f"Looking for source calendar '{self.source_name}'...")
-        source_id = self.client.get_calendar_id_by_name(self.source_name)
+        print(
+            f"{Colors.OKCYAN}{Colors.BOLD}🔍 Syncing '{self.source_name}' ➔ '{self.target_name}'{Colors.ENDC}"
+        )
 
+        source_id = self.client.get_calendar_id_by_name(self.source_name)
         if not source_id:
-            print(f"Error: Source calendar '{self.source_name}' not found.")
+            print(
+                f"{Colors.FAIL}✖ Source calendar '{self.source_name}' not found.{Colors.ENDC}"
+            )
             sys.exit(1)
 
-        print(f"Looking for target calendar '{self.target_name}'...")
         target_id = self.client.get_calendar_id_by_name(self.target_name)
-
         if not target_id:
-            print(f"Target calendar not found. Creating '{self.target_name}'...")
+            print(
+                f"{Colors.WARNING}⚠ Target calendar not found. Creating '{self.target_name}'...{Colors.ENDC}"
+            )
             target_id = self.client.create_calendar(self.target_name)
 
-        print("Fetching events from source...")
         source_events = self.client.get_all_events(source_id)
-        print(f"Fetched {len(source_events)} source events.")
-
-        print("Fetching events from target...")
         target_events = self.client.get_all_events(target_id)
         target_events_map = {e["id"]: e for e in target_events}
-        print(f"Fetched {len(target_events)} target events.")
+
+        print(
+            f"{Colors.OKBLUE}📥 Fetched {len(source_events)} source & {len(target_events)} target events.{Colors.ENDC}"
+        )
 
         source_event_ids = set()
-
         inserted = 0
         updated = 0
         deleted = 0
@@ -69,18 +82,19 @@ class CalendarSyncProcessor:
             valid_id = "".join(
                 c for c in event_id.lower() if c in "abcdefghijklmnopqrstuv0123456789"
             )
-
             source_event_ids.add(valid_id)
 
             summary = s_event.get("summary", "")
-            self.log(f"Processing event: '{summary}'")
+            self.log(f"\n{Colors.BOLD}Event: {summary}{Colors.ENDC}")
 
             # Determine new color
             new_color_id = self.strategy.determine_color(s_event)
             if new_color_id:
-                self.log(f"  -> Match found! Setting colorId to {new_color_id}")
+                self.log(
+                    f" ↳ {Colors.OKCYAN}Strategy matched (colorId: {new_color_id}){Colors.ENDC}"
+                )
             else:
-                self.log(f"  -> No specific match. Using default calendar color.")
+                self.log(f" ↳ {Colors.OKBLUE}Using default calendar color{Colors.ENDC}")
 
             # Construct body for target event
             t_body = {
@@ -131,24 +145,28 @@ class CalendarSyncProcessor:
                     try:
                         self.client.update_event(target_id, valid_id, t_body)
                         updated += 1
-                        self.log(f"  -> Event has changes. Updated in target calendar.")
-                        import time
-
+                        self.log(
+                            f" ↳ {Colors.OKGREEN}Updated in target calendar{Colors.ENDC}"
+                        )
                         time.sleep(0.5)  # Avoid rate limits
                     except Exception as e:
-                        print(f"Failed to update '{summary}' - {e}")
+                        print(
+                            f"{Colors.FAIL}✖ Failed to update '{summary}' - {e}{Colors.ENDC}"
+                        )
                 else:
-                    self.log(f"  -> Event is identical. Skipped update.")
+                    self.log(f" ↳ {Colors.WARNING}Identical (Skipped){Colors.ENDC}")
             else:
                 try:
                     self.client.insert_event(target_id, t_body)
                     inserted += 1
-                    self.log(f"  -> Event is new. Inserted into target calendar.")
-                    import time
-
+                    self.log(
+                        f" ↳ {Colors.OKGREEN}Inserted into target calendar{Colors.ENDC}"
+                    )
                     time.sleep(0.5)  # Avoid rate limits
                 except Exception as e:
-                    print(f"Failed to insert '{summary}' - {e}")
+                    print(
+                        f"{Colors.FAIL}✖ Failed to insert '{summary}' - {e}{Colors.ENDC}"
+                    )
 
         # Delete events that no longer exist in source
         for t_event_id in target_events_map:
@@ -157,21 +175,18 @@ class CalendarSyncProcessor:
                     self.client.delete_event(target_id, t_event_id)
                     deleted += 1
                     self.log(
-                        f"Deleted old event ID '{t_event_id}' that no longer exists in source."
+                        f" ↳ {Colors.FAIL}Deleted old event ID '{t_event_id}'{Colors.ENDC}"
                     )
-                    import time
-
                     time.sleep(0.5)  # Avoid rate limits
                 except Exception as e:
-                    print(f"Failed to delete '{t_event_id}' - {e}")
+                    print(
+                        f"{Colors.FAIL}✖ Failed to delete '{t_event_id}' - {e}{Colors.ENDC}"
+                    )
 
-        print(
-            f"Finished sync. Inserted: {inserted}, Updated: {updated}, Deleted: {deleted}"
-        )
-        print(
-            f"IMPORTANT: Open your Google Calendar and HIDE the original '{self.source_name}' calendar."
-        )
-        print(f"You will now use '{self.target_name}' to see your colored events!")
+        print(f"\n{Colors.OKGREEN}{Colors.BOLD}✔ Finished Sync!{Colors.ENDC}")
+        print(f"  Inserted: {Colors.OKGREEN}{inserted}{Colors.ENDC}")
+        print(f"  Updated:  {Colors.WARNING}{updated}{Colors.ENDC}")
+        print(f"  Deleted:  {Colors.FAIL}{deleted}{Colors.ENDC}\n")
 
 
 def main():
@@ -202,7 +217,7 @@ def main():
     try:
         creds = authenticator.get_credentials()
     except FileNotFoundError:
-        print(f"Error: '{credentials_path}' not found.")
+        print(f"{Colors.FAIL}Error: '{credentials_path}' not found.{Colors.ENDC}")
         sys.exit(1)
 
     client = CalendarClient(credentials=creds)
