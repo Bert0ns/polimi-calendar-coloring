@@ -126,9 +126,14 @@ By default, your custom color choices are in `course_colors.json` and `exam_stat
 
 ## Architecture
 
-The code follows SOLID principles:
+The code follows SOLID principles and is modularized for clarity:
 
 - `src/auth.py`: Handles Google OAuth 2.0.
 - `src/calendar_client.py`: Wrapper for Google API interactions.
-- `src/strategy.py`: Contains the logic for the colors and interactive prompting (Open/Closed principle).
-- `src/main.py`: Coordinates the sync process, configures the environment, and manages the command line interface.
+- `src/colors.py`: Centralized ANSI and Google Calendar color definitions.
+- `src/sync_processor.py`: Coordinates the sync process and delta comparisons.
+- `src/strategies/`: Contains the logic for event coloring (Open/Closed principle).
+  - `base.py`: Abstract base classes and JSON persistence logic.
+  - `exams.py`: Rules for coloring and auto-declining exams.
+  - `lectures.py`: Rules for deterministic course coloring.
+- `src/main.py`: Configures the environment and manages the command line interface.
