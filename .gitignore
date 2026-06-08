@@ -8,7 +8,3 @@ env
 # Google API Credentials (CRITICAL - DO NOT COMMIT)
 credentials.json
 token.pickle
-
-# User Data
-# course_colors.json
-# exam_states.json

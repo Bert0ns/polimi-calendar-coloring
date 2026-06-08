@@ -99,6 +99,31 @@ python3 src/main.py lectures -v
 
 Because the script creates a _copy_ of your exams to color them, **you should hide the original calendar** in your Google Calendar web interface or mobile app. Otherwise, you will see duplicates of every event! You can do this by unchecking the box next to the original "Polimi <student_id>" calendar in the sidebar.
 
+## Running in the Cloud (GitHub Actions)
+
+This repository includes a GitHub Actions workflow (`.github/workflows/manual_sync.yml`) that allows you to trigger the sync manually from the cloud without running it on your laptop!
+
+### Setup Instructions for GitHub Actions
+
+Because your API credentials are kept highly secure and ignored by Git, you must provide them to GitHub as Repository Secrets:
+
+1. **Get your Base64 Token**: Since `token.pickle` is a binary file, you must convert it to text. Run this in your local terminal:
+   ```bash
+   base64 token.pickle -w 0
+   ```
+   _(Copy the giant string it outputs)_
+2. **Add Secrets**: Go to your GitHub repository **Settings** -> **Secrets and variables** -> **Actions**. Click **New repository secret** and add:
+   - `GCP_CREDENTIALS_JSON`: Paste the raw text contents of your `credentials.json` file.
+   - `GCP_TOKEN_PICKLE_B64`: Paste the base64 string you copied in Step 1.
+   - `SOURCE_CALENDAR_NAME`: custom source calendar name
+   - `TARGET_CALENDAR_NAME`: custom target calendar name
+
+### Using your custom colors in the cloud
+
+By default, your custom color choices are in `course_colors.json` and `exam_states.json`.
+
+---
+
 ## Architecture
 
 The code follows SOLID principles:
