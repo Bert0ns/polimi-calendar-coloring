@@ -21,8 +21,15 @@ class Authenticator:
 
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
+                try:
+                    creds.refresh(Request())
+                except Exception:
+                    # If the refresh token is revoked or invalid, delete the file and force re-auth
+                    if os.path.exists(self.token_path):
+                        os.remove(self.token_path)
+                    creds = None
+
+            if not creds or not creds.valid:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     self.credentials_path, self.SCOPES
                 )

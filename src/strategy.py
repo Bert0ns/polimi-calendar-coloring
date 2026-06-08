@@ -97,7 +97,7 @@ class ExamColoringStrategy(EventColoringStrategy):
                 )
 
             while True:
-                prompt_msg = f"{Colors.OKCYAN}❓ Subscribed to '{title}' on {date_str}?{suggestion_str}: {Colors.ENDC}"
+                prompt_msg = f"{Colors.OKCYAN}❓ Subscribed to '{title}' on {date_str}?{Colors.ENDC}{suggestion_str}: "
                 ans = input(prompt_msg).strip().lower()
 
                 if ans == "" and default_ans:
@@ -142,8 +142,14 @@ class LectureColoringStrategy(EventColoringStrategy):
 
     def _load_course_colors(self):
         if os.path.exists(self.course_colors_file):
-            with open(self.course_colors_file, "r") as f:
-                return json.load(f)
+            try:
+                with open(self.course_colors_file, "r") as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                print(
+                    f"{Colors.WARNING}⚠ Warning: '{self.course_colors_file}' is corrupted. Starting fresh.{Colors.ENDC}"
+                )
+                return {}
         return {}
 
     def _save_course_colors(self):
