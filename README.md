@@ -4,12 +4,13 @@ This script connects to your Google Calendar and synchronizes events from a read
 
 ### Features
 
-- Connects to your Google account using OAuth 2.0.
-- Reads events from a specified source calendar (e.g., `"Polimi 11163057"`).
-- Synchronizes these events into a new target calendar (e.g., `"Polimi 11163057 Colored"`).
-- Automatically applies the following color rules to your exams:
-  - If the Title starts with `"Esame: "` and Description starts with `"Iscritto"`, the event is colored **Red**.
-  - If the Title starts with `"Esame: "` and Description starts with `"Non iscritto"`, the event is colored **Grey**.
+- **Intelligent Synchronization**: Safely copies events from a source calendar to a target calendar, updating only what has changed to minimize API calls and avoid rate limits.
+- **Auto-Coloring**: Automatically colors exams **Red** if you are subscribed ("Iscritto") and **Grey** if you are not ("Non iscritto").
+- **Interactive Mode**: Optionally run the script in interactive mode to be prompted for your subscription status on each exam. It's smart enough to suggest answers and auto-decline duplicate exams on different dates!
+- **Environment Configuration**: Easily configure calendar names and credentials paths using a `.env` file.
+- **Beautiful Terminal Output**: Features a concise, color-coded ANSI terminal interface so you know exactly what is happening.
+
+---
 
 ## Prerequisites
 
@@ -35,13 +36,25 @@ Because this script accesses your personal Google Calendar, you must create your
    - Click Create, then download the JSON file.
 6. Rename the downloaded file to `credentials.json` and place it in the same directory as this README.
 
-### 2. Install Dependencies
+### 2. Configure Environment Variables
+
+Copy the provided `.env.example` file to create your own `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Inside `.env`, you can customize the names of your source and target calendars if they differ from the defaults.
+
+### 3. Install Dependencies
 
 Open a terminal in the project directory and run:
 
 ```bash
 pip install -r requirements.txt
 ```
+
+---
 
 ## Usage
 
@@ -57,11 +70,26 @@ python3 main.py
 2. You will likely see a warning saying "Google hasn't verified this app". Click **Advanced** -> **Go to [App Name] (unsafe)**. This is perfectly normal since you just created the app yourself.
 3. Grant the requested permissions to manage your calendars.
 
-The script will now look for your original calendar, create the "Colored" version, and synchronize all the events with the correct colors applied!
+### Command Line Flags
+
+You can customize the script's behavior using the following flags:
+
+- **`-i` or `--interactive`**: Enables interactive mode. The script will pause on every exam it finds and ask if you are subscribed.
+  - It will parse the event description to offer a `[Suggested: y/n]` answer—just press `Enter` to accept the suggestion.
+  - _Smart tracking_: Once you answer `y` to an exam on a specific date, it will automatically decline any other dates for that exact same exam!
+- **`-v` or `--verbose`**: Enables detailed logging. By default, the script only prints a short summary of how many events were inserted, updated, or deleted. With verbose mode, you'll see a color-coded log of the decision-making process for every single event.
+
+Example combining both flags:
+
+```bash
+python3 main.py -i -v
+```
+
+---
 
 ## Important Note
 
-Because the script creates a _copy_ of your exams to color them, **you should hide the original calendar** in your Google Calendar web interface or mobile app. Otherwise, you will see duplicates of every event! You can do this by unchecking the box next to the original "Polimi 11163057" calendar in the sidebar.
+Because the script creates a _copy_ of your exams to color them, **you should hide the original calendar** in your Google Calendar web interface or mobile app. Otherwise, you will see duplicates of every event! You can do this by unchecking the box next to the original "Polimi <student_id>" calendar in the sidebar.
 
 ## Architecture
 
@@ -69,5 +97,5 @@ The code follows SOLID principles:
 
 - `auth.py`: Handles Google OAuth 2.0.
 - `calendar_client.py`: Wrapper for Google API interactions.
-- `strategy.py`: Contains the logic for the colors (Open/Closed principle).
-- `main.py`: Coordinates the sync process.
+- `strategy.py`: Contains the logic for the colors and interactive prompting (Open/Closed principle).
+- `main.py`: Coordinates the sync process, configures the environment, and manages the command line interface.
