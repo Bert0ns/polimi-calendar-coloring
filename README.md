@@ -103,7 +103,7 @@ Because the script creates a _copy_ of your exams to color them, **you should hi
 
 The code follows SOLID principles:
 
-- `auth.py`: Handles Google OAuth 2.0.
-- `calendar_client.py`: Wrapper for Google API interactions.
-- `strategy.py`: Contains the logic for the colors and interactive prompting (Open/Closed principle).
-- `main.py`: Coordinates the sync process, configures the environment, and manages the command line interface.
+- `src/auth.py`: Handles Google OAuth 2.0.
+- `src/calendar_client.py`: Wrapper for Google API interactions.
+- `src/strategy.py`: Contains the logic for the colors and interactive prompting (Open/Closed principle).
+- `src/main.py`: Coordinates the sync process, configures the environment, and manages the command line interface.
