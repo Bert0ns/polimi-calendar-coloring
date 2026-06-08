@@ -1,5 +1,6 @@
 import sys
 import os
+import argparse
 from dotenv import load_dotenv
 
 from auth import Authenticator
@@ -11,12 +12,18 @@ class CalendarSyncProcessor:
     """Coordinates syncing from a read-only calendar to a colored writable calendar."""
 
     def __init__(
-        self, client: CalendarClient, strategy, source_name: str, target_name: str
+        self, client: CalendarClient, strategy, source_name: str, target_name: str, verbose: bool = False
     ):
         self.client = client
         self.strategy = strategy
         self.source_name = source_name
         self.target_name = target_name
+        self.verbose = verbose
+
+    def log(self, message):
+        """Prints message only if verbose mode is enabled."""
+        if self.verbose:
+            print(message)
 
     def process(self):
         print(f"Looking for source calendar '{self.source_name}'...")
@@ -54,21 +61,26 @@ class CalendarSyncProcessor:
                 continue
 
             # Google Calendar requires IDs to be base32hex (a-v, 0-9).
-            # The original IDs from the imported calendar might start with '_' or contain invalid chars.
             valid_id = "".join(
                 c for c in event_id.lower() if c in "abcdefghijklmnopqrstuv0123456789"
             )
 
             source_event_ids.add(valid_id)
+            
+            summary = s_event.get("summary", "")
+            self.log(f"Processing event: '{summary}'")
 
             # Determine new color
             new_color_id = self.strategy.determine_color(s_event)
+            if new_color_id:
+                self.log(f"  -> Match found! Setting colorId to {new_color_id}")
+            else:
+                self.log(f"  -> No specific match. Using default calendar color.")
 
             # Construct body for target event
-            # We copy only standard fields to avoid API errors with read-only properties
             t_body = {
                 "id": valid_id,
-                "summary": s_event.get("summary", ""),
+                "summary": summary,
                 "description": s_event.get("description", ""),
                 "start": s_event.get("start"),
                 "end": s_event.get("end"),
@@ -79,7 +91,7 @@ class CalendarSyncProcessor:
                 t_body["colorId"] = new_color_id
 
             if valid_id in target_events_map:
-                # Compare to see if an update is actually needed to save API calls
+                # Compare to see if an update is actually needed
                 t_event = target_events_map[valid_id]
                 needs_update = False
                 for key, value in t_body.items():
@@ -91,14 +103,18 @@ class CalendarSyncProcessor:
                     try:
                         self.client.update_event(target_id, valid_id, t_body)
                         updated += 1
+                        self.log(f"  -> Event has changes. Updated in target calendar.")
                     except Exception as e:
-                        print(f"Failed to update {s_event.get('summary')} - {e}")
+                        print(f"Failed to update '{summary}' - {e}")
+                else:
+                    self.log(f"  -> Event is identical. Skipped update.")
             else:
                 try:
                     self.client.insert_event(target_id, t_body)
                     inserted += 1
+                    self.log(f"  -> Event is new. Inserted into target calendar.")
                 except Exception as e:
-                    print(f"Failed to insert {s_event.get('summary')} - {e}")
+                    print(f"Failed to insert '{summary}' - {e}")
 
         # Delete events that no longer exist in source
         for t_event_id in target_events_map:
@@ -106,8 +122,9 @@ class CalendarSyncProcessor:
                 try:
                     self.client.delete_event(target_id, t_event_id)
                     deleted += 1
+                    self.log(f"Deleted old event ID '{t_event_id}' that no longer exists in source.")
                 except Exception as e:
-                    print(f"Failed to delete {t_event_id} - {e}")
+                    print(f"Failed to delete '{t_event_id}' - {e}")
 
         print(
             f"Finished sync. Inserted: {inserted}, Updated: {updated}, Deleted: {deleted}"
@@ -119,6 +136,10 @@ class CalendarSyncProcessor:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Sync and color Google Calendar events.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging to see exactly what is happening to each event.")
+    args = parser.parse_args()
+
     load_dotenv()
     
     source_name = os.getenv("SOURCE_CALENDAR_NAME", "Polimi 11163057")
@@ -140,6 +161,7 @@ def main():
         strategy=strategy,
         source_name=source_name,
         target_name=target_name,
+        verbose=args.verbose
     )
     processor.process()
 
