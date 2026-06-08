@@ -5,8 +5,10 @@ This script connects to your Google Calendar and synchronizes events from a read
 ### Features
 
 - **Intelligent Synchronization**: Safely copies events from a source calendar to a target calendar, updating only what has changed to minimize API calls and avoid rate limits.
-- **Auto-Coloring**: Automatically colors exams **Red** if you are subscribed ("Iscritto") and **Grey** if you are not ("Non iscritto").
-- **Interactive Mode**: Optionally run the script in interactive mode to be prompted for your subscription status on each exam. It's smart enough to suggest answers and auto-decline duplicate exams on different dates!
+- **Auto-Coloring Exams**: Automatically colors exams **Red** if you are subscribed ("Iscritto") and **Grey** if you are not ("Non iscritto").
+- **Auto-Coloring Lectures**: Automatically assigns unique, consistent colors to different courses ("Lezione: Didattica - [Course Name]"). 
+- **Interactive Mode**: Optionally run the script with `-i` to manually choose exactly which exams you are subscribed to, and manually assign specific colors to your courses!
+- **Persistent Memory**: Saves your course color choices to `course_colors.json` so your calendar stays perfectly color-coordinated across future syncs.
 - **Environment Configuration**: Easily configure calendar names and credentials paths using a `.env` file.
 - **Beautiful Terminal Output**: Features a concise, color-coded ANSI terminal interface so you know exactly what is happening.
 

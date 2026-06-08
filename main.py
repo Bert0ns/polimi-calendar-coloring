@@ -6,7 +6,11 @@ from dotenv import load_dotenv
 
 from auth import Authenticator
 from calendar_client import CalendarClient
-from strategy import PolimiExamColoringStrategy
+from strategy import (
+    CompositeColoringStrategy,
+    ExamColoringStrategy,
+    LectureColoringStrategy,
+)
 
 
 class Colors:
@@ -43,7 +47,7 @@ class CalendarSyncProcessor:
 
     def process(self):
         print(
-            f"{Colors.OKCYAN}{Colors.BOLD}🔍 Syncing '{self.source_name}' ➔ '{self.target_name}'{Colors.ENDC}"
+            f"\n{Colors.OKCYAN}{Colors.BOLD}🔍 Syncing '{self.source_name}' ➔ '{self.target_name}'{Colors.ENDC}"
         )
 
         source_id = self.client.get_calendar_id_by_name(self.source_name)
@@ -89,12 +93,6 @@ class CalendarSyncProcessor:
 
             # Determine new color
             new_color_id = self.strategy.determine_color(s_event)
-            if new_color_id:
-                self.log(
-                    f" ↳ {Colors.OKCYAN}Strategy matched (colorId: {new_color_id}){Colors.ENDC}"
-                )
-            else:
-                self.log(f" ↳ {Colors.OKBLUE}Using default calendar color{Colors.ENDC}")
 
             # Construct body for target event
             t_body = {
@@ -106,8 +104,25 @@ class CalendarSyncProcessor:
             }
             if "location" in s_event:
                 t_body["location"] = s_event["location"]
+
             if new_color_id:
+                self.log(
+                    f" ↳ {Colors.OKCYAN}Strategy matched (colorId: {new_color_id}){Colors.ENDC}"
+                )
                 t_body["colorId"] = new_color_id
+            elif (
+                valid_id in target_events_map
+                and "colorId" in target_events_map[valid_id]
+            ):
+                # CRITICAL: If the strategy doesn't enforce a color (e.g. user skipped lectures),
+                # preserve the existing color so we don't accidentally wipe it!
+                preserved_color = target_events_map[valid_id]["colorId"]
+                self.log(
+                    f" ↳ {Colors.OKBLUE}Strategy skipped, preserving existing color (colorId: {preserved_color}){Colors.ENDC}"
+                )
+                t_body["colorId"] = preserved_color
+            else:
+                self.log(f" ↳ {Colors.OKBLUE}Using default calendar color{Colors.ENDC}")
 
             if valid_id in target_events_map:
                 # Compare carefully to see if an update is actually needed
@@ -148,7 +163,7 @@ class CalendarSyncProcessor:
                         self.log(
                             f" ↳ {Colors.OKGREEN}Updated in target calendar{Colors.ENDC}"
                         )
-                        time.sleep(0.5)  # Avoid rate limits
+                        time.sleep(0.2)  # Avoid rate limits
                     except Exception as e:
                         print(
                             f"{Colors.FAIL}✖ Failed to update '{summary}' - {e}{Colors.ENDC}"
@@ -162,7 +177,7 @@ class CalendarSyncProcessor:
                     self.log(
                         f" ↳ {Colors.OKGREEN}Inserted into target calendar{Colors.ENDC}"
                     )
-                    time.sleep(0.5)  # Avoid rate limits
+                    time.sleep(0.2)  # Avoid rate limits
                 except Exception as e:
                     print(
                         f"{Colors.FAIL}✖ Failed to insert '{summary}' - {e}{Colors.ENDC}"
@@ -177,7 +192,7 @@ class CalendarSyncProcessor:
                     self.log(
                         f" ↳ {Colors.FAIL}Deleted old event ID '{t_event_id}'{Colors.ENDC}"
                     )
-                    time.sleep(0.5)  # Avoid rate limits
+                    time.sleep(0.2)  # Avoid rate limits
                 except Exception as e:
                     print(
                         f"{Colors.FAIL}✖ Failed to delete '{t_event_id}' - {e}{Colors.ENDC}"
@@ -192,6 +207,11 @@ class CalendarSyncProcessor:
 def main():
     parser = argparse.ArgumentParser(
         description="Sync and color Google Calendar events."
+    )
+    parser.add_argument(
+        "target",
+        choices=["exams", "lectures"],
+        help="Mandatory: Specify what to process (exams or lectures).",
     )
     parser.add_argument(
         "-v",
@@ -213,6 +233,12 @@ def main():
     target_name = os.getenv("TARGET_CALENDAR_NAME", "Polimi 11163057 Colored")
     credentials_path = os.getenv("CREDENTIALS_PATH", "credentials.json")
 
+    strategies_to_use = []
+    if args.target == "exams":
+        strategies_to_use.append(ExamColoringStrategy(interactive=args.interactive))
+    elif args.target == "lectures":
+        strategies_to_use.append(LectureColoringStrategy(interactive=args.interactive))
+
     authenticator = Authenticator(credentials_path=credentials_path)
     try:
         creds = authenticator.get_credentials()
@@ -221,7 +247,7 @@ def main():
         sys.exit(1)
 
     client = CalendarClient(credentials=creds)
-    strategy = PolimiExamColoringStrategy(interactive=args.interactive)
+    strategy = CompositeColoringStrategy(strategies_to_use)
 
     processor = CalendarSyncProcessor(
         client=client,
