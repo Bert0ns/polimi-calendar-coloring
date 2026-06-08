@@ -91,19 +91,29 @@ class CalendarSyncProcessor:
                 t_body["colorId"] = new_color_id
 
             if valid_id in target_events_map:
-                # Compare to see if an update is actually needed
+                # Compare carefully to see if an update is actually needed
                 t_event = target_events_map[valid_id]
                 needs_update = False
-                for key, value in t_body.items():
-                    if t_event.get(key) != value:
-                        needs_update = True
-                        break
+                
+                if t_event.get('summary', '') != t_body.get('summary', ''): needs_update = True
+                if t_event.get('description', '') != t_body.get('description', ''): needs_update = True
+                if t_event.get('location', '') != t_body.get('location', ''): needs_update = True
+                if t_event.get('colorId') != t_body.get('colorId'): needs_update = True
+                
+                s_start = t_body.get('start', {}).get('dateTime', t_body.get('start', {}).get('date'))
+                t_start = t_event.get('start', {}).get('dateTime', t_event.get('start', {}).get('date'))
+                if s_start != t_start: needs_update = True
+                
+                s_end = t_body.get('end', {}).get('dateTime', t_body.get('end', {}).get('date'))
+                t_end = t_event.get('end', {}).get('dateTime', t_event.get('end', {}).get('date'))
+                if s_end != t_end: needs_update = True
                 
                 if needs_update:
                     try:
                         self.client.update_event(target_id, valid_id, t_body)
                         updated += 1
                         self.log(f"  -> Event has changes. Updated in target calendar.")
+                        import time; time.sleep(0.5) # Avoid rate limits
                     except Exception as e:
                         print(f"Failed to update '{summary}' - {e}")
                 else:
@@ -113,6 +123,7 @@ class CalendarSyncProcessor:
                     self.client.insert_event(target_id, t_body)
                     inserted += 1
                     self.log(f"  -> Event is new. Inserted into target calendar.")
+                    import time; time.sleep(0.5) # Avoid rate limits
                 except Exception as e:
                     print(f"Failed to insert '{summary}' - {e}")
 
@@ -123,6 +134,7 @@ class CalendarSyncProcessor:
                     self.client.delete_event(target_id, t_event_id)
                     deleted += 1
                     self.log(f"Deleted old event ID '{t_event_id}' that no longer exists in source.")
+                    import time; time.sleep(0.5) # Avoid rate limits
                 except Exception as e:
                     print(f"Failed to delete '{t_event_id}' - {e}")
 
@@ -138,6 +150,7 @@ class CalendarSyncProcessor:
 def main():
     parser = argparse.ArgumentParser(description="Sync and color Google Calendar events.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging to see exactly what is happening to each event.")
+    parser.add_argument("-i", "--interactive", action="store_true", help="Ask interactively if you are subscribed to each exam.")
     args = parser.parse_args()
 
     load_dotenv()
@@ -154,7 +167,7 @@ def main():
         sys.exit(1)
 
     client = CalendarClient(credentials=creds)
-    strategy = PolimiExamColoringStrategy()
+    strategy = PolimiExamColoringStrategy(interactive=args.interactive)
 
     processor = CalendarSyncProcessor(
         client=client,
